@@ -4,7 +4,7 @@ Completed: Login & Authentication, Pull Channel List
 
 To Do: Get stream URL, Figure out a way to play DASH MPEG streams in Plex (No longer RTMP)
 
-SuperSport.bundle
+SuperSport2.bundle
 =================
 SuperSport video plugin for Plex
 
