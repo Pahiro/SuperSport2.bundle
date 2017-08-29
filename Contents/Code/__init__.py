@@ -1,7 +1,7 @@
 ####################################################################################################
 import re
 import pyaes
-import urllib, urllib2, json, cookielib
+import urllib, urllib2, json
 import auth
 import httplib
 import requests
@@ -58,8 +58,7 @@ def LiveStreamMenu():
 	
 	if cookie != False:
 		oc = ObjectContainer(title2 = "Live Streams", view_group= "InfoList")
-		cj = cookielib.LWPCookieJar()
-	
+		
 		headers = { 'Host' : 'www.supersport.com', 
 				    'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0',
 					'Accept' : '*/*',
@@ -83,7 +82,8 @@ def LiveStreamMenu():
 		live_streams_id = (re.findall('https://www.supersport.com/live-video/([0-9]{1,6})', live_streams_str))[0]
 		live_streams_json_query = LIVE_DATA_JSON_URL + "?vid=" + live_streams_id
 		
-		r = requests.get(live_streams_json_query, headers=headers, cookies=cj)
+		r = requests.get(live_streams_json_query, headers=headers, cookies=cookie)
+		#Getting a freaking Auth fail here. Works in browser.
 		#channel_data = json.loads(r.text)
 		
 		Log("Stream found: " + live_streams['NowPlaying']['Channel'] + ": " + live_streams_id)
