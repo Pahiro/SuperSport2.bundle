@@ -1,32 +1,30 @@
-import re
-import pyaes
-import urllib, urllib2, json, cookielib
-import httplib
-import requests 
-import auth
+import requests, json
 
 session = requests.Session()
 
-response = session.post(
-    'https://connect.dstv.com/4.1/en-ZA/Login',
-    data={'email':'email', 'password':'password'}
-)
+loginData = { 'email' : 'email', 
+              'password' : 'password',
+              'RememberMe' : 'True',
+              'submit' : 'login'
+    }
 
-print response.status_code #200 - Logs in Successfully
+r = session.post('https://connect.dstv.com/4.1/en-ZA/Login', data=loginData)
 
-headers = { 'Host' : 'www.supersport.com',
-            'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0',
-            'Accept' : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language' : 'en-US,en;q=0.5',
-            'Accept-Encoding' : 'gzip, deflate, br', 
-            'Connection' : 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control' : 'max-age=0' }
+#Grab the connect token
+params = { 'origin' : 'https://www.supersport.com' }
+r = session.get('https://connect.dstv.com/4.1/en-ZA/CrossDomainStorage/UserInfo', params=params)
+tokens = json.loads(r.text)
 
+#Resolve the user token into a Cookie
+data = { 'token' : tokens['connectToken'] }
+r = session.post('https://www.supersport.com/Handlers/ResolveToken.ashx', data=data)
+result = json.loads(r.text)
+print result['success']
 
-#Still get an auth failure.
-r = session.get("https://www.supersport.com/video/playerlivejson.aspx?vid=104264", headers=headers)
-#r = requests.get("https://www.supersport.com/video/playerlivejson.aspx?vid=104264", headers=headers)
+params = { 'vid' : '104264' }
 
-print(r.text + "\n") #Working
+#Get the video source
+r = session.get("https://www.supersport.com/video/playerlivejson.aspx", params=params)
+result = json.loads(r.text)
+print(result['result']['services']['videoURL'] + "\n") 
 
