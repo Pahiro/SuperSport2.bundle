@@ -1,8 +1,8 @@
 This plugin is not yet fully functional.
 
-Completed: Login & Authentication, Pull Channel List
+Completed: Login & Authentication, Pull Channel List, Get stream URL
 
-To Do: Get stream URL, Figure out a way to play DASH MPEG streams in Plex (No longer RTMP)
+To Do: Figure out a way to play DASH MPEG streams in Plex (No longer RTMP)
 
 SuperSport2.bundle
 =================
