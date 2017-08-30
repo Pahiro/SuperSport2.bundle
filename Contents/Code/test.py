@@ -13,10 +13,10 @@ r = session.post('https://connect.dstv.com/4.1/en-ZA/Login', data=loginData)
 #Grab the connect token
 params = { 'origin' : 'https://www.supersport.com' }
 r = session.get('https://connect.dstv.com/4.1/en-ZA/CrossDomainStorage/UserInfo', params=params)
-tokens = json.loads(r.text)
+result = json.loads(r.text)
 
 #Resolve the user token into a Cookie
-data = { 'token' : tokens['connectToken'] }
+data = { 'token' : result['connectToken'] }
 r = session.post('https://www.supersport.com/Handlers/ResolveToken.ashx', data=data)
 result = json.loads(r.text)
 print result['success']

@@ -1,47 +1,47 @@
-#import re
-import urllib
 import requests 
+import json
 
 loginurl  = "https://connect.dstv.com/4.1/en-ZA/Login"
-memberurl = "https://connect.dstv.com/4.1/en-ZA/Overview/"
 
-username = Prefs["email"]
-password = Prefs["password"]
+session = requests.Session()
 
-headers = {
-  'HTTP_USER_AGENT': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.13) Gecko/2009073022 Firefox/3.0.13',
-  'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml; q=0.9,*/*; q=0.8',
-  'Content-Type': 'application/x-www-form-urlencoded'
-}
-
-
-####################################################################################################
-# Does the login and opens some link
 def login():
-    loginData = urllib.urlencode(
-    { 
-        'email' : username,
-        'password' : password,
-        'RememberMe' : True,
-        'submit' : 'login'
-    })
+    global session
     
-    r  = requests.post(loginurl, loginData)    
-    return r.cookies
+    username = Prefs["email"]
+    password = Prefs["password"]
+    
+    loginData = { 
+        'email' : username, 
+        'password' : password,
+        'RememberMe' : 'True',
+        'submit' : 'login'
+    }
+    
+    Log("Loading login page...")
+    r = session.post('https://connect.dstv.com/4.1/Login', data=loginData)
+    if r.status_code == 200 or r.status_code == 304:
+        Log("Successfully logged in")
+    
+    return session
 
-def account_check(html):
-    if html.find('<span class="username">') == None:
-        return False
-    else:
-        return True
-
-def check_auth():
-    if username != '' and password != '':
-        r = requests.get(memberurl)
-        if (account_check(r.text) == False):
-            return False
-        else:
-            print ("Logged in" + "\n")
-            return r.cookies
-    else:
-        return False
+def grabToken():
+    global session
+    
+    #Grab the connect token
+    params = { 'origin' : 'https://www.supersport.com' }
+    r = session.get('https://connect.dstv.com/4.1/en-ZA/CrossDomainStorage/UserInfo', params=params)
+    if r.status_code == 200:
+        Log("Token retrieved")
+    result = json.loads(r.text)
+    resolveToken(result)
+    
+def resolveToken(result):
+    global session
+    
+    #Resolve the user token into a Cookie
+    data = { 'token' : result['connectToken'] }
+    r = session.post('https://www.supersport.com/Handlers/ResolveToken.ashx', data=data)
+    result = json.loads(r.text)
+    if result['success'] == 'true':
+        Log('Cookie generated for session')

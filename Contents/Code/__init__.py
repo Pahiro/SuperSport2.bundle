@@ -6,6 +6,8 @@ import auth
 import httplib
 import requests
 
+Log("Initializing...")
+
 VIDEO_PREFIX = "/video/SuperSport2"
 
 NAME = "SuperSport2 Plugin"
@@ -38,7 +40,11 @@ def Start():
 ####################################################################################################
 
 def MainMenu():
-
+	session = auth.session #Our global session
+	
+	Log("Logging in...")
+	session = auth.login()
+		
 	oc = ObjectContainer()  
 
 	oc.add(DirectoryObject(key = Callback(LiveStreamMenu), title = 'Live Streams'))
@@ -50,15 +56,13 @@ def MainMenu():
 
 ####################################################################################################
 
-def LiveStreamMenu():
-	Log("auth level = %s" % auth.check_auth())
-	cookie = auth.check_auth()
-	if cookie == False:
-		cookie = auth.login()
+def LiveStreamMenu():	
+	auth.grabToken() #Getting timeout issues so putting it here
+	session = auth.session #Our global session
 	
-	if cookie != False:
+	if session != None:
 		oc = ObjectContainer(title2 = "Live Streams", view_group= "InfoList")
-		
+	
 		headers = { 'Host' : 'www.supersport.com', 
 				    'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0',
 					'Accept' : '*/*',
@@ -72,7 +76,7 @@ def LiveStreamMenu():
 					'Cache-Control' : 'no-cache' }
 	
 
-	r = requests.get(LIVE_STREAMS_URL, headers=headers)
+	r = session.get(LIVE_STREAMS_URL, headers=headers)
 
 	live_stream_data = json.loads(r.text)
 	
@@ -82,22 +86,17 @@ def LiveStreamMenu():
 		live_streams_id = (re.findall('https://www.supersport.com/live-video/([0-9]{1,6})', live_streams_str))[0]
 		live_streams_json_query = LIVE_DATA_JSON_URL + "?vid=" + live_streams_id
 		
-		r = requests.get(live_streams_json_query, headers=headers, cookies=cookie)
-		#Getting a freaking Auth fail here. Works in browser.
-		#channel_data = json.loads(r.text)
+		r = session.get(live_streams_json_query, headers=headers)
+
+		channel_data = json.loads(r.text)
 		
 		Log("Stream found: " + live_streams['NowPlaying']['Channel'] + ": " + live_streams_id)
 		
 		oc.add(VideoClipObject(
-			key = RTMPVideoURL(
-				url = live_streams['NowPlaying']['Link'], #channel_data['result']['services']['videoURL'],
-				clip = live_streams['NowPlaying']['Link'],
-				swf_url = SWF_PLAYER_URL, 
-				live = True),
-				rating_key = live_streams_id,
-				#thumb = Resource.ContentsOfURLWithFallback(url=channel_data['result']['menu']['details']['imageURL'], fallback=ICON), 
 				title = live_streams['NowPlaying']['Channel'],
-				summary = live_streams['NowPlaying']['EventNowPlaying'] 
+				url =  channel_data['result']['services']['videoURL'],
+				summary = live_streams['NowPlaying']['EventNowPlaying'],
+				thumb = Resource.ContentsOfURLWithFallback(url=channel_data['result']['menu']['details']['imageURL'], fallback=ICON)				 
 				)
 			)
 	return oc
