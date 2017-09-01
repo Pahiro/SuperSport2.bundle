@@ -1,4 +1,5 @@
-import requests 
+import requests
+#import grequests
 import json
 
 loginurl  = "https://connect.dstv.com/4.1/en-ZA/Login"
@@ -19,11 +20,12 @@ def login():
     }
     
     Log("Loading login page...")
-    r = session.post('https://connect.dstv.com/4.1/Login', data=loginData)
-    if r.status_code == 200 or r.status_code == 304:
-        Log("Successfully logged in")
-    
-    return session
+    r = session.post('https://connect.dstv.com/4.1/Login', 
+                       data=loginData)
+    resolveToken(grabToken())
+    #grequests.send(r, grequests.Pool(1))
+
+
 
 def grabToken():
     global session
@@ -34,7 +36,7 @@ def grabToken():
     if r.status_code == 200:
         Log("Token retrieved")
     result = json.loads(r.text)
-    resolveToken(result)
+    return result
     
 def resolveToken(result):
     global session
