@@ -4,9 +4,17 @@ import urllib, urllib2, json
 import auth
 import httplib
 import requests
+import cookielib
 
 Log("Initializing...")
-session = auth.login() #Async Login request
+
+session = auth.session
+
+try:
+	session.cookies['connectIdCookie']
+except:
+	auth.login()
+	session = auth.session
 
 VIDEO_PREFIX = "/video/SuperSport2"
 
@@ -49,7 +57,7 @@ def MainMenu():
 
 	return oc
 
-def LiveStreamMenu():	
+def LiveStreamMenu(*args, **kwargs):	
 	global session
 	session = auth.session #Our global session
 	
@@ -73,7 +81,7 @@ def LiveStreamMenu():
 
 	live_stream_data = json.loads(r.text)
 	
-	for live_streams in live_stream_data['d']['ChannelStream']:
+	for index, live_streams in enumerate(live_stream_data['d']['ChannelStream']):
 		live_streams_str = live_streams['NowPlaying']['Link']
 		
 		live_streams_id = (re.findall('https://www.supersport.com/live-video/([0-9]{1,6})', live_streams_str))[0]
@@ -93,9 +101,10 @@ def LiveStreamMenu():
 			
 			items = MediaObjectsForURL(channel_data['result']['services']['videoURL'])
 			Log("Adding video clips")
-			if items != None:
+			if items != None and live_streams_id != None:
 				oc.add(
 					VideoClipObject(
+						key = live_streams_id,
 						rating_key = live_streams_id,
 						title = live_streams['NowPlaying']['Channel'],
 						items = items,
@@ -104,11 +113,13 @@ def LiveStreamMenu():
 						summary = live_streams['NowPlaying']['EventNowPlaying']
 					)
 			)
-		Log("Next")
+			if index == 1:
+				break
 	return oc
+
 @indirect
 def PlayHLS(url):
-	return IndirectResponse(VideoClipObject, key = url)
+	return IndirectResponse(VideoClipObject, key=HTTPLiveStreamURL(url))
 
 @deferred
 def MediaObjectsForURL(url):
@@ -123,6 +134,10 @@ def MediaObjectsForURL(url):
                     PartObject(key=Callback(PlayHLS(hls_url)))
                 ],
                 video_resolution = 720,
+				protocol='hls',
+				container='mpegts',
+				video_codec=VideoCodec.H264,
+				audio_codec=AudioCodec.AAC,
                 audio_channels = 2,
                 video_frame_rate = 50,
                 optimized_for_streaming = True
@@ -133,12 +148,20 @@ def MediaObjectsForURL(url):
 	Log("Constructing Media Objects")
 	for stream in streams:
 		Log(stream['url'])
+		#r = session.get(stream['url'])
+		#Log(r.reason + ":" + r.text)
 		mo.append(
             MediaObject(
                 parts = [
-                    PartObject(key=HTTPLiveStreamURL(stream['url']))
+                    PartObject(
+						key = HTTPLiveStreamURL(Callback(PlayHLS,url=stream['url']))
+					)
                 ],
                 video_resolution = stream['resolution'],
+                protocol='hls',
+                container='mpegts',
+                video_codec=VideoCodec.H264,
+				audio_codec=AudioCodec.AAC,
                 audio_channels = 2,
                 video_frame_rate = 50 if stream['resolution'] == 720 else 25,
                 bitrate = int(stream['bitrate'] / 1024),
@@ -184,9 +207,3 @@ def GetHLSStreams(url):
 	sorted_streams = sorted(streams, key=lambda stream: stream['bitrate'], reverse=True)
 
 	return sorted_streams
-
-#audio_codec = AudioCodec.AAC,
-#video_codec = VideoCodec.H264,
-#container = 'MPEGTS',
-#protocol = 'DASH',
-#optimized_for_streaming = True,
