@@ -6,29 +6,23 @@ import httplib
 import requests
 import cookielib
 
-Log("Initializing...")
+VIDEO_PREFIX = "/video/SuperSport2"
+NAME = "SuperSport2 Plugin"
+LIVE_STREAMS_URL = "https://www.supersport.com/AjaxOperation.aspx/GetVideoStreams"
+LIVE_DATA_JSON_URL = "https://www.supersport.com/video/playerlivejson.aspx"
+RAW_HLS_CLIENTS = ['Android', 'iOS', 'Roku', 'Safari', 'tvOS', 'Mystery 4', 'Konvergo']
+ART = 'art-default.jpg'
+ICON = 'icon.png'
 
 session = auth.session
 
 try:
+	#Check whether we have our cookie in memory
+	#Need to store this in a file. Channel is logging in too often.
 	session.cookies['connectIdCookie']
 except:
 	auth.login()
 	session = auth.session
-
-VIDEO_PREFIX = "/video/SuperSport2"
-
-NAME = "SuperSport2 Plugin"
-
-LIVE_STREAMS_URL = "https://www.supersport.com/AjaxOperation.aspx/GetVideoStreams"
-LIVE_DATA_JSON_URL = "https://www.supersport.com/video/playerlivejson.aspx"
-VIDEO_DATA_WS_URL = "https://www.supersport.com/video/data.aspx"
-VIDEO_DATA_JSON_URL = "https://www.supersport.com/video/playerjson.aspx"
-
-RAW_HLS_CLIENTS = ['Android', 'iOS', 'Roku', 'Safari', 'tvOS', 'Mystery 4', 'Konvergo']
-
-ART = 'art-default.jpg'
-ICON = 'icon-default.png'
 
 def Start():
 	Plugin.AddPrefixHandler("/video/SuperSport2", MainMenu, "SuperSport2", ICON, ART)
@@ -41,13 +35,8 @@ def Start():
 	DirectoryObject.art = R(ART)
 	VideoClipObject.thumb = R(ICON)
 
+@handler(VIDEO_PREFIX, "SuperSport2", thumb=ICON)
 def MainMenu():
-	global session
-	session = auth.session #Our global session
-	
-	Log("Logging in...")
-	
-		
 	oc = ObjectContainer()  
 
 	oc.add(DirectoryObject(key = Callback(LiveStreamMenu), title = 'Live Streams'))
@@ -57,72 +46,68 @@ def MainMenu():
 
 	return oc
 
-def LiveStreamMenu(*args, **kwargs):	
-	global session
-	session = auth.session #Our global session
-	
-	if session != None:
-		oc = ObjectContainer(title2 = "Live Streams", view_group= "InfoList")
-	
-		headers = { 'Host' : 'www.supersport.com', 
-				    'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0',
-					'Accept' : '*/*',
-					'Accept-Language' : 'en-US,en;q=0.5',
-					'Accept-Encoding' : 'gzip, deflate, br',
-					'Content-Type' : 'application/json; charset=utf-8',
-					'X-Requested-With' : 'XMLHttpRequest',
-					'Referer' : 'https://www.supersport.com/live-video',
-					'Connection' : 'keep-alive',
-					'Pragma' : 'no-cache',
-					'Cache-Control' : 'no-cache' }
-	
-
-	r = session.get(LIVE_STREAMS_URL, headers=headers)
-
-	live_stream_data = json.loads(r.text)
-	
-	for index, live_streams in enumerate(live_stream_data['d']['ChannelStream']):
-		live_streams_str = live_streams['NowPlaying']['Link']
-		
-		live_streams_id = (re.findall('https://www.supersport.com/live-video/([0-9]{1,6})', live_streams_str))[0]
-		live_streams_json_query = LIVE_DATA_JSON_URL + "?vid=" + live_streams_id
-		
-		r = session.get(live_streams_json_query, headers=headers)
-		
-		try:
-			channel_data = json.loads(r.text)
-		except:
-			Log(r.reason + ": Authorization failed - Close all sessions and try again")
-			channel_data = None #Authorization Failed
-			
-		if channel_data != None:
-			Log("Stream found: " + live_streams['NowPlaying']['Channel'] + ": " + live_streams_id)
-			Log("Stream URL: " + channel_data['result']['services']['videoURL'])
-			
-			items = MediaObjectsForURL(channel_data['result']['services']['videoURL'])
-			Log("Adding video clips")
-			if items != None and live_streams_id != None:
-				oc.add(
-					VideoClipObject(
-						key = live_streams_id,
-						rating_key = live_streams_id,
-						title = live_streams['NowPlaying']['Channel'],
-						items = items,
-						thumb = Resource.ContentsOfURLWithFallback(url=channel_data['result']['menu']['details']['imageURL'], fallback=ICON),
-						art = Resource.ContentsOfURLWithFallback(url=channel_data['result']['menu']['details']['imageURL'], fallback=ICON),
-						summary = live_streams['NowPlaying']['EventNowPlaying']
-					)
-			)
-			if index == 1:
-				break
+@route(VIDEO_PREFIX + '/highlights')
+def HighlightsMenu():
+	oc = ObjectContainer(title2 = "Highlights", view_group= "InfoList")
 	return oc
 
-@indirect
-def PlayHLS(url):
-	return IndirectResponse(VideoClipObject, key=HTTPLiveStreamURL(url))
+@route(VIDEO_PREFIX + '/livestreams')
+def LiveStreamMenu():	
+	global session
+	
+	oc = ObjectContainer(title2 = "Live Streams", view_group= "InfoList")
+
+	headers = { 'Content-Type' : 'application/json; charset=utf-8' }
+	r = session.get(LIVE_STREAMS_URL, headers=headers)
+	Log(r.status_code)
+	live_streams = json.loads(r.text)
+	
+	for index, live_stream in enumerate(live_streams['d']['ChannelStream']):
+		live_stream_url = live_stream['NowPlaying']['Link']
+		live_stream_id = (re.findall('https://www.supersport.com/live-video/([0-9]{1,6})', live_stream_url))[0]
+		live_stream_json = LIVE_DATA_JSON_URL + "?vid=" + live_stream_id
+		live_stream_title = live_stream['NowPlaying']['Channel']
+		live_stream_summary = live_stream['NowPlaying']['EventNowPlaying'] 
+		
+		r = session.get(live_stream_json)
+		channel_data = json.loads(r.text)
+		
+		live_stream_m3u8 = channel_data['result']['services']['videoURL']
+		
+		oc.add(CreateVideoClipObject(
+				stream_id = live_stream_id,
+				stream_title = live_stream_title,
+				stream_url = live_stream_m3u8,
+				stream_summary = live_stream_summary
+			)
+		)
+	return oc
+
+@route(VIDEO_PREFIX + '/createvideoclipobject', include_container=bool)
+def CreateVideoClipObject(stream_id, stream_title, stream_url, stream_summary, include_container=False, **kwargs):
+	videoclip_obj = VideoClipObject(
+		key = Callback(CreateVideoClipObject,
+					stream_id = stream_id,
+					stream_title = stream_title,
+					stream_url = stream_url,
+					stream_summary = stream_summary,
+					include_container=True),
+		rating_key = stream_id,
+		title = stream_title,
+		items = MediaObjectsForURL(stream_url),
+		thumb = R('icon' + stream_title + '.png'),
+		art = R(stream_title + '.jpg'),		
+		summary = stream_summary
+	)
+
+	if include_container:
+		return ObjectContainer(objects=[videoclip_obj])
+	else:
+		return videoclip_obj
 
 @deferred
 def MediaObjectsForURL(url):
+	#Original is an ISML playlist. 
 	hls_url = url.replace('.isml','.isml/playlist.m3u8') 
 	
 	streams = GetHLSStreams(hls_url)
@@ -131,10 +116,11 @@ def MediaObjectsForURL(url):
 		return [
             MediaObject(
                 parts = [
-                    PartObject(key=Callback(PlayHLS(hls_url)))
+					PartObject(key=HTTPLiveStreamURL(hls_url))
+                    #PartObject(key=Callback(PlayHLS(hls_url)))
                 ],
                 video_resolution = 720,
-				protocol='hls',
+				protocol='dash',
 				container='mpegts',
 				video_codec=VideoCodec.H264,
 				audio_codec=AudioCodec.AAC,
@@ -147,18 +133,16 @@ def MediaObjectsForURL(url):
 	mo = []
 	Log("Constructing Media Objects")
 	for stream in streams:
-		Log(stream['url'])
-		#r = session.get(stream['url'])
-		#Log(r.reason + ":" + r.text)
 		mo.append(
             MediaObject(
                 parts = [
                     PartObject(
-						key = HTTPLiveStreamURL(Callback(PlayHLS,url=stream['url']))
+						#key = HTTPLiveStreamURL(Callback(PlayHLS,url=stream['url']))
+						key = HTTPLiveStreamURL(url=stream['url'])
 					)
                 ],
                 video_resolution = stream['resolution'],
-                protocol='hls',
+                protocol='dash',
                 container='mpegts',
                 video_codec=VideoCodec.H264,
 				audio_codec=AudioCodec.AAC,
@@ -171,7 +155,6 @@ def MediaObjectsForURL(url):
 	Log("Return Media Items")
 	return mo
 
-
 def GetHLSStreams(url):
 	global session
 	
@@ -180,10 +163,6 @@ def GetHLSStreams(url):
 	r = session.get(url)
 	playlist = r.text
 
-	# Parse the m3u8 file to get:
-	# - URL
-	# - Resolution
-	# - Bitrate
 	for line in playlist.splitlines():
 		if 'BANDWIDTH' in line:
 			stream = {}
@@ -207,3 +186,7 @@ def GetHLSStreams(url):
 	sorted_streams = sorted(streams, key=lambda stream: stream['bitrate'], reverse=True)
 
 	return sorted_streams
+
+@indirect
+def PlayHLS(url):
+	return IndirectResponse(VideoClipObject, key=HTTPLiveStreamURL(url))
