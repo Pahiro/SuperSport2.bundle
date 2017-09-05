@@ -1,4 +1,4 @@
-Unfortunately it seems that all of the DSTV streams are DRM enabled. FFMPEG transcoder doesn't support the SAMPLE-AES decryption yet. There are few libaries out there, of note; https://github.com/selsta/hlsdl, but I'm not quite sure how one would go about implementing it yet.
+Unfortunately it seems that all of the DSTV streams are DRM enabled. FFMPEG transcoder doesn't support the SAMPLE-AES decryption yet. At least this plugin is ready for the day that happens. There are few libaries out there, of note; https://github.com/selsta/hlsdl, but I'm not quite sure how one would go about implementing it yet. 
 
 SuperSport2.bundle
 =================
