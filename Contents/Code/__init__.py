@@ -5,6 +5,8 @@ import auth
 import httplib
 import requests
 import cookielib
+import os
+
 
 VIDEO_PREFIX = "/video/SuperSport2"
 NAME = "SuperSport2 Plugin"
@@ -16,13 +18,11 @@ ICON = 'icon.png'
 
 session = auth.session
 
-try:
-	#Check whether we have our cookie in memory
-	#Need to store this in a file. Channel is logging in too often.
-	session.cookies['connectIdCookie']
-except:
+if auth.token == None:
 	auth.login()
 	session = auth.session
+else:
+	Log(auth.token)
 
 def Start():
 	Plugin.AddPrefixHandler("/video/SuperSport2", MainMenu, "SuperSport2", ICON, ART)
@@ -34,6 +34,7 @@ def Start():
 	DirectoryObject.thumb = R(ICON)
 	DirectoryObject.art = R(ART)
 	VideoClipObject.thumb = R(ICON)
+
 
 @handler(VIDEO_PREFIX, "SuperSport2", thumb=ICON)
 def MainMenu():
@@ -59,7 +60,7 @@ def LiveStreamMenu():
 
 	headers = { 'Content-Type' : 'application/json; charset=utf-8' }
 	r = session.get(LIVE_STREAMS_URL, headers=headers)
-	Log(r.status_code)
+
 	live_streams = json.loads(r.text)
 	
 	for index, live_stream in enumerate(live_streams['d']['ChannelStream']):
@@ -107,62 +108,39 @@ def CreateVideoClipObject(stream_id, stream_title, stream_url, stream_summary, i
 
 @deferred
 def MediaObjectsForURL(url):
-	#Original is an ISML playlist. 
-	hls_url = url.replace('.isml','.isml/playlist.m3u8') 
-	
-	streams = GetHLSStreams(hls_url)
-
-	if Client.Platform in RAW_HLS_CLIENTS:
-		return [
-            MediaObject(
-                parts = [
-					PartObject(key=HTTPLiveStreamURL(hls_url))
-                    #PartObject(key=Callback(PlayHLS(hls_url)))
-                ],
-                video_resolution = 720,
-				protocol='dash',
-				container='mpegts',
-				video_codec=VideoCodec.H264,
-				audio_codec=AudioCodec.AAC,
-                audio_channels = 2,
-                video_frame_rate = 50,
-                optimized_for_streaming = True
-            )
-        ]
-
-	mo = []
-	Log("Constructing Media Objects")
-	for stream in streams:
-		mo.append(
-            MediaObject(
-                parts = [
-                    PartObject(
-						#key = HTTPLiveStreamURL(Callback(PlayHLS,url=stream['url']))
-						key = HTTPLiveStreamURL(url=stream['url'])
-					)
-                ],
-                video_resolution = stream['resolution'],
-                protocol='dash',
-                container='mpegts',
-                video_codec=VideoCodec.H264,
-				audio_codec=AudioCodec.AAC,
-                audio_channels = 2,
-                video_frame_rate = 50 if stream['resolution'] == 720 else 25,
-                bitrate = int(stream['bitrate'] / 1024),
-                optimized_for_streaming = True
-            )
-		)
-	Log("Return Media Items")
-	return mo
-
-def GetHLSStreams(url):
 	global session
+	#hls_url = url.replace('.isml','.isml/playlist.m3u8') 
+	hls_url = url.replace('.isml','.isml/.mpd')
 	
+	r = session.get(hls_url)
+	f = os.open('print.txt', os.O_WRONLY + os.O_CREAT)
+	os.write(f, r.text)
+	os.close(f)	
+
+	return [
+        MediaObject(
+            parts = [
+                PartObject(key=Callback(PlayHLS, url=hls_url))
+                #PartObject(key=HTTPLiveStreamURL(hls_url))
+            ],
+            video_resolution = 720,
+			protocol='dash',
+			container=Container.MP4,
+			video_codec=VideoCodec.H264,
+			audio_codec=AudioCodec.AAC,
+            audio_channels = 2,
+            video_frame_rate = 50,
+            optimized_for_streaming = True
+        )
+    ]
+
+@route(VIDEO_PREFIX + '/gethlsstreams')
+def GetHLSStreams(url):
+	#Parses HLS M3U8 playlist 
 	streams = []
 
 	r = session.get(url)
 	playlist = r.text
-
 	for line in playlist.splitlines():
 		if 'BANDWIDTH' in line:
 			stream = {}
@@ -187,6 +165,29 @@ def GetHLSStreams(url):
 
 	return sorted_streams
 
-@indirect
+@indirect 
+@route(VIDEO_PREFIX + '/playhls')
 def PlayHLS(url):
-	return IndirectResponse(VideoClipObject, key=HTTPLiveStreamURL(url))
+	
+	headers = { 
+		'Accept' : '*/*',
+		'Accept-Encoding' :	'gzip, deflate, br',
+		'Accept-Language' :	'en-US,en;q=0.5',
+		'Connection' :	'keep-alive',
+		'Host' : 'rnd-live-secure.akamaized.net',
+		'Origin' : 'https://www.supersport.com',
+		'Referer' : 'live_stream_url + ?_token=' + auth.token,
+		'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:55.0) Gecko/20100101 Firefox/55.0'
+	}
+	
+	Log(auth.token)
+	
+	global session
+	
+	return IndirectResponse(
+		VideoClipObject, 
+		#key=url,
+		key=HTTPLiveStreamURL(url), 
+		http_cookies=str(session.cookies), 
+		http_headers=headers
+		)

@@ -1,13 +1,22 @@
 import requests
-#import grequests
 import json
+import cookielib
 
 loginurl  = "https://connect.dstv.com/4.1/en-ZA/Login"
-
 session = requests.Session()
+token = None
+#cookie_file = 'cookie.txt'
+#cj = cookielib.LWPCookieJar(cookie_file)
+
+#try:
+#    cj.load()
+#except:
+#    pass
+
+#session.cookies = cj
 
 def login():
-    global session
+    global session, cj
     
     username = Prefs["email"]
     password = Prefs["password"]
@@ -20,22 +29,29 @@ def login():
     }
     
     Log("Loading login page...")
-    r = session.post('https://connect.dstv.com/4.1/Login', 
-                       data=loginData)
-    resolveToken(grabToken())
-    #grequests.send(r, grequests.Pool(1))
-
-
+    session.post('https://connect.dstv.com/4.1/Login', 
+                data=loginData)
+    r = grabToken()
+    resolveToken(r)
+    
+    
 
 def grabToken():
-    global session
+    global session, token
     
     #Grab the connect token
     params = { 'origin' : 'https://www.supersport.com' }
-    r = session.get('https://connect.dstv.com/4.1/en-ZA/CrossDomainStorage/UserInfo', params=params)
+    r = session.get('https://connect.dstv.com/4.1/en-ZA/CrossDomainStorage/UserInfo', 
+                    params=params)
     if r.status_code == 200:
-        Log("Token retrieved")
-    result = json.loads(r.text)
+        Log("Token Retrieved")
+    try:
+        result = json.loads(r.text)
+    except: 
+        print r.reason
+    
+    token = result['connectToken']
+    
     return result
     
 def resolveToken(result):
@@ -43,7 +59,7 @@ def resolveToken(result):
     
     #Resolve the user token into a Cookie
     data = { 'token' : result['connectToken'] }
-    r = session.post('https://www.supersport.com/Handlers/ResolveToken.ashx', data=data)
+    r = session.post('https://www.supersport.com/Handlers/ResolveToken.ashx', 
+                     data=data)
     result = json.loads(r.text)
-    if result['success'] == 'true':
-        Log('Cookie generated for session')
+    Log("Token resolved into cookie")
