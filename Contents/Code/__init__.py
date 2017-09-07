@@ -109,8 +109,15 @@ def CreateVideoClipObject(stream_id, stream_title, stream_url, stream_summary, i
 @deferred
 def MediaObjectsForURL(url):
 	global session
-	#hls_url = url.replace('.isml','.isml/playlist.m3u8') 
-	hls_url = url.replace('.isml','.isml/.mpd')
+	url = url.split('?',1)[0]
+	Log(url)
+	######################################
+	# Unified Streaming Platform formats #
+	######################################
+	#hls_url = url.replace('.isml','.isml/playlist.m3u8') #FFMPEG: SAMPLE-AES encryption is not supported yet
+	#hls_url = url.replace('.isml','.isml/.mpd') #FFMPEG: Invalid data found when processing input
+	hls_url = url.replace('.isml','.isml/Manifest') #FFMPEG: Invalid data found when processing input
+	#hls_url = url.replace('.isml','.isml/.f4m') #403 Forbidden
 	
 	r = session.get(hls_url)
 	f = os.open('print.txt', os.O_WRONLY + os.O_CREAT)
@@ -120,74 +127,25 @@ def MediaObjectsForURL(url):
 	return [
         MediaObject(
             parts = [
-                PartObject(key=Callback(PlayHLS, url=hls_url))
-                #PartObject(key=HTTPLiveStreamURL(hls_url))
+                PartObject(
+					key=HTTPLiveStreamURL(Callback(PlayHLS, url=hls_url))
+                	#PartObject(key=Callback(PlayHLS, url=hls_url))
+                 	#PartObject(key=HTTPLiveStreamURL(hls_url))
+                )
             ],
+			protocol = 'hss',
+			container = 'mp4',
+			video_codec = 'avc',
+			audio_codec = 'aac',
             video_resolution = 720,
-			protocol='dash',
-			container=Container.MP4,
-			video_codec=VideoCodec.H264,
-			audio_codec=AudioCodec.AAC,
             audio_channels = 2,
             video_frame_rate = 50,
             optimized_for_streaming = True
         )
     ]
 
-@route(VIDEO_PREFIX + '/gethlsstreams')
-def GetHLSStreams(url):
-	#Parses HLS M3U8 playlist 
-	streams = []
-
-	r = session.get(url)
-	playlist = r.text
-	for line in playlist.splitlines():
-		if 'BANDWIDTH' in line:
-			stream = {}
-			stream['bitrate'] = int(Regex('(?<=BANDWIDTH=)[0-9]+').search(line).group(0))
-
-			if 'RESOLUTION' in line:
-				stream['resolution'] = int(Regex('(?<=RESOLUTION=)[0-9]+x[0-9]+').search(line).group(0).split('x')[1])
-			else:
-				stream['resolution'] = 0
-
-		elif '.m3u8' in line:
-			path = ''
-
-			if not line.startswith('http'):
-				path = url[ : url.rfind('/') + 1]
-
-			stream['url'] = path + line
-
-			streams.append(stream)
-
-	sorted_streams = sorted(streams, key=lambda stream: stream['bitrate'], reverse=True)
-
-	return sorted_streams
-
-@indirect 
-@route(VIDEO_PREFIX + '/playhls')
+@indirect
+@route(VIDEO_PREFIX + '/playhls.m3u8')
 def PlayHLS(url):
-	
-	headers = { 
-		'Accept' : '*/*',
-		'Accept-Encoding' :	'gzip, deflate, br',
-		'Accept-Language' :	'en-US,en;q=0.5',
-		'Connection' :	'keep-alive',
-		'Host' : 'rnd-live-secure.akamaized.net',
-		'Origin' : 'https://www.supersport.com',
-		'Referer' : 'live_stream_url + ?_token=' + auth.token,
-		'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:55.0) Gecko/20100101 Firefox/55.0'
-	}
-	
-	Log(auth.token)
-	
 	global session
-	
-	return IndirectResponse(
-		VideoClipObject, 
-		#key=url,
-		key=HTTPLiveStreamURL(url), 
-		http_cookies=str(session.cookies), 
-		http_headers=headers
-		)
+	return IndirectResponse(VideoClipObject, key=url, http_cookies=str(session.cookies))
