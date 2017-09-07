@@ -2,6 +2,7 @@
 07-Sept-2017
 
 Looked into Unified Streaming Platform
+
 Available formats listed:
 - MPD (MPEG Dash)
 - M3U8 (HTTP Live Streaming)
