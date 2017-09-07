@@ -15,7 +15,7 @@ Results of current tests:
 - F4M - Server responds with 403: Access Denied
 - Manifest - FFMPEG: Invalid data found when processing input
 
-I suspect I just need to properly specify a container for the Manifest and MPD. Looking into it.
+I suspect I just need to properly specify a protocol for the Manifest and MPD. Looking into it.
 
 06-Sept-2017
 
