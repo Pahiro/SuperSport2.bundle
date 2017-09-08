@@ -1,6 +1,6 @@
 08-Sept-2017
 
-Selsta highlighted to me that each of the streams generated through USP are DRM enabled and as a result, can't be transcoded into anything, nor would Plex be able to direct play the content. Seems that DRM locks the content to a specific player, which in this case is the Bitmovin player.
+Selsta highlighted to me that each of the manifests generated through USP are DRM enabled and as a result, can't be transcoded into anything, nor would Plex be able to direct play the content. Seems that DRM locks the content to a specific player, which in this case is the Bitmovin player.
 
 07-Sept-2017
 
