@@ -1,6 +1,10 @@
 08-Sept-2017
 
-Selsta highlighted to me that each of the manifests generated through USP are DRM enabled and as a result, can't be transcoded into anything, nor would Plex be able to direct play the content.
+Selsta highlighted to me that each of the manifests generated through USP are DRM enabled and as a result, can't be transcoded into anything, nor would Plex be able to direct play the content. If Plex ever got around to supporting DRM enabled content, which seems unlikely, this could be something to look at again. 
+
+My intention with this was not and will never be to provide illegal access to DRM protected content but was an attempt to provide an alternative player for Supersport content. To centralize my media consumption to Plex, as it's what I use for just about everything else. Was hoping to flesh out this channel with an EPG eventually as well.
+
+PS. DSTV uses Google's Widevine DRM protection. If you spot something in Plex's updates referencing Widevine, let me know. :)
 
 07-Sept-2017
 
